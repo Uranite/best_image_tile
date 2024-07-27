@@ -15,6 +15,16 @@ from rich.progress import (
 )
 from chainner_ext import resize, ResizeFilter
 
+progress = Progress(
+    SpinnerColumn(),
+    TextColumn("{task.description}"),
+    BarColumn(complete_style="green"),
+    TaskProgressColumn(),
+    TimeElapsedColumn(),
+    "ETA:",
+    TimeRemainingColumn(),
+    MofNCompleteColumn()
+)
 
 class BestTile:
     """
@@ -90,16 +100,7 @@ class BestTile:
             self.sequential_run()
             return
 
-        with executor, Progress(
-            SpinnerColumn(),
-            TextColumn("{task.description}"),
-            BarColumn(complete_style="green"),
-            TaskProgressColumn(),
-            TimeElapsedColumn(),
-            "ETA:",
-            TimeRemainingColumn(),
-            MofNCompleteColumn()
-        ) as progress:
+        with executor, progress:
             task = progress.add_task("Processing images", total=len(self.all_images))
             futures = [executor.submit(self.process, img_name) for img_name in self.all_images]
             for future in as_completed(futures):
@@ -110,16 +111,7 @@ class BestTile:
         """
         Run the processing on all images sequentially.
         """
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("{task.description}"),
-            BarColumn(complete_style="green"),
-            TaskProgressColumn(),
-            TimeElapsedColumn(),
-            "ETA:",
-            TimeRemainingColumn(),
-            MofNCompleteColumn()
-        ) as progress:
+        with progress:
             task = progress.add_task("Processing images", total=len(self.all_images))
             for img_name in self.all_images:
                 self.process(img_name)
