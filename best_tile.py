@@ -32,7 +32,7 @@ class BestTile:
     - `run()`: Run the processing on all images using the specified processing type.
     """
 
-    def __init__(self, in_folder: str, out_folder: str, tile_size: int = 512, process_type: str = "thread",
+    def __init__(self, in_folder: str, out_folder: str, tile_size: int = 512, process_type: str = "sequential",
                  scale: int = 1):
         """
         Initialize the BestTile class.
