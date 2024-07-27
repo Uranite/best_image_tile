@@ -2,7 +2,17 @@ import os
 import numpy as np
 from pepeline import read, save, cvt_color, CvtType, best_tile
 import cv2
-from tqdm.contrib.concurrent import process_map, thread_map
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    SpinnerColumn,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 from chainner_ext import resize, ResizeFilter
 
 
@@ -73,9 +83,44 @@ class BestTile:
         Run the processing on all images using the specified processing type.
         """
         if self.process_type == "thread":
-            thread_map(self.process, self.all_images)
+            executor = ThreadPoolExecutor()
         elif self.process_type == "process":
-            process_map(self.process, self.all_images)
+            executor = ProcessPoolExecutor()
         else:
+            self.sequential_run()
+            return
+
+        with executor, Progress(
+            SpinnerColumn(),
+            TextColumn("{task.description}"),
+            BarColumn(complete_style="green"),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            "ETA:",
+            TimeRemainingColumn(),
+            MofNCompleteColumn()
+        ) as progress:
+            task = progress.add_task("Processing images", total=len(self.all_images))
+            futures = [executor.submit(self.process, img_name) for img_name in self.all_images]
+            for future in as_completed(futures):
+                future.result()  # Ensure any exceptions are raised
+                progress.advance(task)
+
+    def sequential_run(self):
+        """
+        Run the processing on all images sequentially.
+        """
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("{task.description}"),
+            BarColumn(complete_style="green"),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            "ETA:",
+            TimeRemainingColumn(),
+            MofNCompleteColumn()
+        ) as progress:
+            task = progress.add_task("Processing images", total=len(self.all_images))
             for img_name in self.all_images:
                 self.process(img_name)
+                progress.advance(task)
