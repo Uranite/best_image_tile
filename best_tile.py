@@ -2,7 +2,6 @@ import os
 import numpy as np
 from pepeline import read, save, cvt_color, CvtType, best_tile, ImgColor, ImgFormat
 import cv2
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -13,18 +12,8 @@ from rich.progress import (
     TimeElapsedColumn,
     TimeRemainingColumn,
 )
+from tqdm.contrib.concurrent import process_map, thread_map
 from chainner_ext import resize, ResizeFilter
-
-progress = Progress(
-    SpinnerColumn(),
-    TextColumn("{task.description}"),
-    BarColumn(complete_style="green"),
-    TaskProgressColumn(),
-    TimeElapsedColumn(),
-    "ETA:",
-    TimeRemainingColumn(),
-    MofNCompleteColumn()
-)
 
 class BestTile:
     """
@@ -92,27 +81,26 @@ class BestTile:
         """
         Run the processing on all images using the specified processing type.
         """
-        if self.process_type == "thread":
-            executor = ThreadPoolExecutor()
-        elif self.process_type == "process":
-            executor = ProcessPoolExecutor()
-        else:
-            self.sequential_run()
-            return
-
-        with executor, progress:
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("{task.description}"),
+            BarColumn(complete_style="green"),
+            TaskProgressColumn(),
+            TimeElapsedColumn(),
+            "ETA:",
+            TimeRemainingColumn(),
+            MofNCompleteColumn()
+        ) as progress:
             task = progress.add_task("Processing images", total=len(self.all_images))
-            futures = [executor.submit(self.process, img_name) for img_name in self.all_images]
-            for future in as_completed(futures):
-                future.result()  # Ensure any exceptions are raised
-                progress.advance(task)
 
-    def sequential_run(self):
-        """
-        Run the processing on all images sequentially.
-        """
-        with progress:
-            task = progress.add_task("Processing images", total=len(self.all_images))
-            for img_name in self.all_images:
+            def update_and_process(img_name: str):
                 self.process(img_name)
                 progress.advance(task)
+
+            if self.process_type == "thread":
+                thread_map(update_and_process, self.all_images)
+            elif self.process_type == "process":
+                process_map(update_and_process, self.all_images)
+            else:
+                for img_name in self.all_images:
+                    update_and_process(img_name)
